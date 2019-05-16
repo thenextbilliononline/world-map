@@ -72,7 +72,7 @@ df2
 
 Likewise, we can see the number of Internet connected servers per one million people below. I divided the data vector by 100 to have more approachable numbers and shifted the two biggest outliers down to the level of the 3rd most dense country. That way, the color scale would be useful since plotly doesn't have out-of-the-box logarithmic support. While the plot is a little misleading, the basic facts of which countries have more servers is preserved.
 
-```{r}
+```{r, echo = FALSE, warning=FALSE, collapse=TRUE}
 servers.per.million <- as.data.frame(wb(indicator = "IT.NET.SECR.P6", startdate = 2017, enddate =2017))
 servers.per.million$date <- NULL
 servers.per.million$indicatorID <- NULL
@@ -90,7 +90,7 @@ df3
 
 Similarly, theworld bank collects data about high-tech exports, measured in 2017 USD. As we can see, many countries have no data available, not because of poor reporting, but because of a lack of high-tech export economies.
 
-```{r}
+```{r, echo = FALSE, warning=FALSE, collapse=TRUE}
 high.tech.exports <- as.data.frame(wb(indicator = "TX.VAL.TECH.CD", startdate = 2017, enddate =2017))
 high.tech.exports$date <- NULL
 high.tech.exports$indicatorID <- NULL
@@ -105,7 +105,7 @@ df4
 
 Finally, I look at some concrete data from the IEEE, the organization tasked with (among other things) assigning blocks of Mac Addresses to manufacturers, assemblers, and resellers around the world. By scraping the allocation file directly, we can ensure our data is as up to date as possible. Then, using some ugly-looking regex, I was able to parse out the two-letter country codes for each Mac Address block. In this way, I can look at the number of unique assignments per country, an indicator of the production side of internet  infrastructure. Additionally, I included an optional line for downloading the Mac Address data for further analysis and historical purposes. 
 
-```{r}
+```{r, echo = FALSE, warning=FALSE, collapse=TRUE}
 #df5 <- curl_download("http://standards-oui.ieee.org/oui.txt", "MACs.txt")
 lines <- readLines("http://standards-oui.ieee.org/oui.txt")
 #head(lines)
@@ -146,14 +146,36 @@ df5$Country <- df5$country
 df5$country <- NULL
 ```
 
+Below, I've added a list of all the Internet Exchange Points (IXPs) around the world. 
+```{r, echo = FALSE, warning=FALSE, collapse=TRUE}
+raw <- curl_download("https://en.wikipedia.org/wiki/List_of_Internet_exchange_points#Active_internet_exchanges", "IXPs.html")
+raw <- readHTMLTable(raw)
+raw <- raw[1]
+raw <- as.data.frame(raw)
+raw <- raw$NULL.V2
+raw <- raw[-1]
+
+countries <- str_extract(raw, ".+?(?=:)")
+countries <- as.data.frame(countries)
+countries <- countries$countries
+countries <- countrycode(countries, "country.name", "iso3c")
+table <- table(countries)
+IXPs.per.country <- as.data.frame(table)
+df6 <- IXPs.per.country
+colnames(df6) <- c("Country", "IXP")
+df6[is.na(df6$IXP)] <- 0
+df6$IXP<-as.numeric(df6$IXP)
+```
+
 Finally, I merged the five data frames together and wrote it out as a csv. 
 
-```{r}
+```{r, echo = FALSE, warning=FALSE, collapse=TRUE}
 # Broadband, Cells, Servers, Exports
 df <- merge(x = df1, y = df2, by = "Country", all = TRUE)
 df <- merge(x = df,  y = df3, by = "Country", all = TRUE)
 df <- merge(x = df,  y = df4, by = "Country", all = TRUE)
 df <- merge(x = df,  y = df5, by = "Country", all = TRUE)
+df <- merge(x = df,  y = df6, by = "Country", all = TRUE)
 df$Country <- countrycode(df$Country, "iso3c", "country.name")
 df
 write.csv(df, file = "InternetIndicators.csv")
